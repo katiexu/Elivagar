@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+import shutil
 
 from elivagar.circuits.arbitrary import get_circ_params
 from elivagar.training.train_circ_np import TQMseLoss
@@ -55,12 +56,20 @@ def train_elivagar_circuits(circ_dir, dataset, embed_type, num_data_reps, device
         print(curr_candidate_inds, curr_best_circuit_ind)
         print(np.max(curr_candidate_scores))
         
-        circ_gates, gate_params, inputs_bounds, weights_bounds = get_circ_params(os.path.join(circ_dir, f'circ_{curr_best_circuit_ind + 1}'))
+        sel_circ_dir = os.path.join(circ_dir, f'circ_{curr_best_circuit_ind + 1}')
+        circ_gates, gate_params, inputs_bounds, weights_bounds = get_circ_params(sel_circ_dir)
         
         np.savetxt(curr_circ_dir + '/gates.txt', circ_gates, fmt="%s")
         np.savetxt(curr_circ_dir + '/gate_params.txt', gate_params, fmt="%s")
         np.savetxt(curr_circ_dir + '/inputs_bounds.txt', inputs_bounds)
         np.savetxt(curr_circ_dir + '/weights_bounds.txt', weights_bounds)
+
+        # [FakeBackend] Copy the physical-qubit mapping of the selected circuit so that noisy inference
+        # (circuit_inference.py --use_qubit_mapping) can read trial_N/qubit_mapping.txt directly.
+        sel_qubit_mapping_path = os.path.join(sel_circ_dir, 'qubit_mapping.txt')
+
+        if os.path.exists(sel_qubit_mapping_path):
+            shutil.copy(sel_qubit_mapping_path, os.path.join(curr_circ_dir, 'qubit_mapping.txt'))
         
         np.savetxt(curr_circ_dir + '/searched_circuit_inds.txt', curr_candidate_inds)
         np.savetxt(curr_circ_dir + '/searched_circuit_scores.txt', curr_candidate_scores)

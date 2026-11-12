@@ -2,11 +2,19 @@ import qiskit
 import pennylane as qml
 import pickle as pkl
 import os
+import warnings
 import qiskit.providers.aer.noise as noise
 
-from qiskit import IBMQ
+# [IBMQ-原始导入，已停用] CNR now loads the local FakeBackend snapshot instead.
+# from qiskit import IBMQ
 import qiskit.circuit.library as gate_lib
 
+from elivagar.circuits.fake_backend_properties import (
+    get_fake_backend_noise_model_data,
+    load_fake_backend_properties,
+    restrict_noise_model_data_to_qubits,
+    resolve_fake_backend_json_path,
+)
 from elivagar.circuits.device_aware import (
     extract_properties_from_braket_device, get_braket_device_qubit_edge_info,
     get_braket_device_1q_succ_probs
@@ -121,12 +129,45 @@ def convert_braket_properties_to_qiskit_noise_model(device_properties_path, symm
         basis_gates[1] += ['cx']
         
     return noise_model, index_map, basis_gates[0] + basis_gates[1], coupling_map
+
+
+def get_fake_backend_noise_model_dict(device_name, json_path=None):
+    """[FakeBackend] Load the noise-model dictionary and hardware metadata from a snapshot."""
+    snapshot_path = resolve_fake_backend_json_path(device_name, json_path)
+    properties = load_fake_backend_properties(snapshot_path)
+    return get_fake_backend_noise_model_data(properties)
+
+
+def noise_model_from_dict(noise_model_data):
+    """[FakeBackend] Construct an Aer noise model while filtering legacy deprecation warnings."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=DeprecationWarning)
+        return noise.NoiseModel.from_dict(noise_model_data)
+
+
+def restrict_fake_backend_noise_model(noise_model_data, qubits):
+    """[FakeBackend] Build an Aer noise model restricted to selected physical qubits."""
+    restricted_noise_model_data = restrict_noise_model_data_to_qubits(noise_model_data, qubits)
+    return noise_model_from_dict(restricted_noise_model_data)
+
+
+def get_fake_backend_noise_model(device_name, json_path=None):
+    """Build an Aer noise model from a local FakeBackend properties snapshot."""
+    noise_model_data, basis_gates, coupling_map = get_fake_backend_noise_model_dict(
+        device_name, json_path
+    )
+
+    # [FakeBackend] Convert the exported snapshot locally; this path needs no IBMQ account.
+    noise_model = noise_model_from_dict(noise_model_data)
+
+    return noise_model, basis_gates, coupling_map
     
 
 def noisy_dev_from_backend(backend_name, num_qubits):
     """
     Create a pennylane device that uses a noise model based on the backend with the name passed in.
     """
+    # [IBMQ-原始代码，已停用] Retained for reference; FakeBackend CNR does not call this path.
     try:
         provider = IBMQ.enable_account(
             'f9be8ebe6cc0b5c9970ca5ae86acad18c1dfb3844ed12b381a458536fcbf46499d62dbb33da9a07627774441860c64ac44e76a6f27dc6f09bba7e0f2ce68e9ff')
@@ -145,6 +186,7 @@ def get_real_backend_dev(backend_name, num_qubits):
     """
     Get the real IBMQ backend with the backend name passed in.
     """
+    # [IBMQ-原始代码，已停用] Retained for reference; FakeBackend CNR does not call this path.
     try:
         provider = IBMQ.enable_account(
             'f9be8ebe6cc0b5c9970ca5ae86acad18c1dfb3844ed12b381a458536fcbf46499d62dbb33da9a07627774441860c64ac44e76a6f27dc6f09bba7e0f2ce68e9ff')
@@ -157,6 +199,7 @@ def get_real_backend_dev(backend_name, num_qubits):
 
 
 def get_noise_model(device_name):
+    # [IBMQ-原始代码，已停用] CNR uses get_fake_backend_noise_model() for local snapshots.
     try:
         provider = IBMQ.enable_account(
             'f9be8ebe6cc0b5c9970ca5ae86acad18c1dfb3844ed12b381a458536fcbf46499d62dbb33da9a07627774441860c64ac44e76a6f27dc6f09bba7e0f2ce68e9ff')

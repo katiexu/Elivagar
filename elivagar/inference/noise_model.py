@@ -13,7 +13,11 @@ from elivagar.circuits.arbitrary import get_circ_params
 from elivagar.circuits.create_circuit import create_qiskit_circ, create_gate_circ
 from elivagar.inference.quantumnat import quantize_and_normalize
 from elivagar.inference.inference_metrics import mse_batch_loss, mse_vec_batch_loss, batch_acc, vec_batch_acc
-from elivagar.utils.create_noise_models import noisy_dev_from_backend, get_noise_model
+# [IBMQ-原始导入，已停用] get_noise_model needs an IBMQ account; inference now uses the FakeBackend snapshot.
+# from elivagar.utils.create_noise_models import noisy_dev_from_backend, get_noise_model
+from elivagar.utils.create_noise_models import noisy_dev_from_backend
+# [FakeBackend] Helpers to build a (per-circuit restricted) Aer noise model from the snapshot dictionary.
+from elivagar.utils.create_noise_models import noise_model_from_dict, restrict_fake_backend_noise_model
 from elivagar.utils.datasets import load_dataset
 
 
@@ -214,16 +218,31 @@ def tq_model_inference_on_noisy_sim_pennylane(circ_dir, device_name, num_runs, m
 def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs, num_runs, num_qubits, meas_qubits, device_name, noise_model, basis_gates,
                                                coupling_map, dataset, embed_type, num_data_reps, num_test_samples=None, human_design=False, compute_noiseless=False,
                                                use_qubit_mapping=False, num_shots=1024, qubit_mapping_file_name=None, transpile_opt_level=0, file_suffix='',
-                                               index_map=None, results_save_dir=None, pick_best=False, use_quantumnat=False, quantumnat_trained_dir=None):
+                                               index_map=None, results_save_dir=None, pick_best=False, use_quantumnat=False, quantumnat_trained_dir=None,
+                                               noise_model_data=None, restrict_noise_to_mapping=True):
     """
     Run noisy inference for TQ circuits in the same folder - used to perform infrence for all ex. random, human designed, etc. circuits with one call.
+
+    [FakeBackend] When noise_model_data (the snapshot noise-model dictionary) is given and restrict_noise_to_mapping is True,
+    a reduced AerSimulator containing only the errors on each circuit's mapped physical qubits is built per circuit; this is
+    the same optimisation used for CNR and avoids re-serialising the full 133-qubit noise model for every test sample.
     """
     x_train, y_train, x_test, y_test = load_dataset(dataset, embed_type, num_data_reps)
     
-    if noise_model is None and 'ibm' in device_name:
-        noise_model, basis_gates, coupling_map = get_noise_model(device_name)
+    # [IBMQ-原始代码，已停用] The IBMQ fallback lookup is retained as a comment.
+    # if noise_model is None and 'ibm' in device_name:
+    #     noise_model, basis_gates, coupling_map = get_noise_model(device_name)
         
-    noisy_dev = AerSimulator(noise_model=noise_model)
+    # [FakeBackend] Only build the shared full-model simulator when per-circuit restriction is not used.
+    use_restricted_noise = restrict_noise_to_mapping and noise_model_data is not None
+
+    if use_restricted_noise:
+        noisy_dev = None
+    else:
+        if noise_model is None and noise_model_data is not None:
+            noise_model = noise_model_from_dict(noise_model_data)
+
+        noisy_dev = AerSimulator(noise_model=noise_model)
     
     all_accs = []
     
@@ -246,10 +265,29 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
             qubit_mapping = np.genfromtxt(os.path.join(curr_circ_dir, qubit_mapping_file_name))
         else:
             qubit_mapping = None
+
+        circ_noisy_dev = noisy_dev
+
+        if use_restricted_noise:
+            # [FakeBackend] Restrict the snapshot noise model to the physical qubits this circuit actually uses.
+            if qubit_mapping is None:
+                mapped_qubits = [q for q in range(num_qubits)]
+            else:
+                mapped_qubits = [int(q) for q in np.atleast_1d(qubit_mapping)]
+
+            if index_map is not None:
+                mapped_qubits = [index_map[q] for q in mapped_qubits]
+
+            restricted_noise_model = restrict_fake_backend_noise_model(noise_model_data, mapped_qubits)
+
+            if not restricted_noise_model.to_dict().get('errors'):
+                print(f'Warning: no FakeBackend noise errors remain for mapping {mapped_qubits} in {curr_circ_dir}.')
+
+            circ_noisy_dev = AerSimulator(noise_model=restricted_noise_model)
         
         losses_list, accs_list = tq_model_inference_on_noisy_sim_qiskit(
             curr_circ_dir, device_name, num_runs, num_qubits, meas_qubits,
-            noisy_dev, basis_gates, coupling_map, qubit_mapping,
+            circ_noisy_dev, basis_gates, coupling_map, qubit_mapping,
             x_test, y_test, None, True, num_shots, compute_noiseless,
             transpile_opt_level, file_suffix, index_map, curr_results_save_dir,
             pick_best, use_quantumnat, quantumnat_trained_dir

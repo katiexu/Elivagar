@@ -11,7 +11,11 @@ from qiskit.circuit.library import XXPlusYYGate
 from torchquantum.functional import gate_wrapper
 from torchquantum.operators import Operation
 from tc.tc_fc import TTLinear
-from braket.circuits import Circuit
+try:
+    # [Optional Braket dependency] Qiskit CNR does not require the Braket SDK.
+    from braket.circuits import Circuit
+except ImportError:
+    Circuit = None
 
 
 def gpi_matrix(params):
@@ -400,6 +404,9 @@ def create_qiskit_circ(gates, gate_params, inputs_bounds, weights_bounds, measur
 
 def create_braket_gate_circ(gates, gate_params, inputs_bounds, weights_bounds, num_qubits, 
                             qubit_mapping=None, verbatim_box=False):
+    if Circuit is None:
+        raise ImportError('The Braket circuit path requires amazon-braket-sdk.')
+
     mapping = {
         'ry': lambda c, ind, theta: c.ry(ind[0], theta[0]),
         'rx': lambda c, ind, theta: c.rx(ind[0], theta[0]),

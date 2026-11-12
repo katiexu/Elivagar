@@ -1,5 +1,7 @@
 import numpy as np
 
+from .fake_backend_properties import extract_properties_from_fake_backend
+
 
 def get_braket_device_qubit_edge_info(device=None, dev_properties=None,
                                       device_name=None):
@@ -247,6 +249,7 @@ def extract_properties_from_braket_device(device_name, device=None,
     )
 
 
+# [IBMQ-原始代码，已停用] Retained for reference; FakeBackend snapshots are used by generation.
 def extract_properties_from_ibm_device(backend):
     gates_parameters = {
         'rz': 1, 'cx': 0, 'sx': 0, 'x': 0, 'y': 0,
@@ -531,20 +534,30 @@ def generate_device_aware_gate_circ(ibm_backend, num_qubits, num_embed_gates,
                                     gate_times=None, ent_succ_probs=None, 
                                     braket_device_properties=None,
                                     braket_device_name=None,
-                                    symmetric_connectivity=False):
+                                    symmetric_connectivity=False,
+                                    fake_backend_properties=None):
     """
     Generate a device-aware circuit via biased random sampling,
     along with a qubit mapping from logical to physical
     qubits based on device connectivity and calibration data.
     """
-    if ibm_backend is not None:
+    # [IBMQ-原始代码，已停用] Keep the legacy extraction path visible for comparison.
+    # if ibm_backend is not None:
+    #     (
+    #         num_device_qubits, connectivity, t1_times, t2_times,
+    #         meas_succ_probs,basis_gates, gates_param_nums, gate_times,
+    #         ent_succ_probs, one_qubit_succ_probs, qubit_inds
+    #     ) = extract_properties_from_ibm_device(
+    #         ibm_backend
+    #     )
+
+    # [FakeBackend] Convert the exported JSON snapshot to device_aware's 11-value format.
+    if fake_backend_properties is not None:
         (
             num_device_qubits, connectivity, t1_times, t2_times,
-            meas_succ_probs,basis_gates, gates_param_nums, gate_times,
+            meas_succ_probs, basis_gates, gates_param_nums, gate_times,
             ent_succ_probs, one_qubit_succ_probs, qubit_inds
-        ) = extract_properties_from_ibm_device(
-            ibm_backend
-        )
+        ) = extract_properties_from_fake_backend(fake_backend_properties)
         
     if braket_device_properties is not None:
         (

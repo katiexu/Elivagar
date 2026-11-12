@@ -1,4 +1,4 @@
-Metadata-Version: 1.1
+Metadata-Version: 2.4
 Name: tc
 Version: 1.0
 Summary: Tensor-Train Network Library
@@ -6,13 +6,24 @@ Home-page: https://github.com/uwjunqi/Tensor-Train-Neural-Network/tree/master/tc
 Author: Jun Qi
 Author-email: jqi41@gatech.edu
 License: LGPL
-Description: 
-        
-        
 Keywords: tc
-Platform: UNKNOWN
 Classifier: License :: OSI Approved :: ISC License (ISCL)
 Classifier: Natural Language :: English
 Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: torch
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: requires-dist
+Dynamic: summary
+
+
+

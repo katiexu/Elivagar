@@ -5,11 +5,16 @@ import torch
 import qiskit.providers.aer.noise as noise
 import time
 
-from qiskit import IBMQ
+# [IBMQ-原始导入，已停用] Inference now reads the local FakeBackend snapshot instead of an IBMQ account.
+# from qiskit import IBMQ
 
 from elivagar.utils.dataset_circuit_hyperparams import dataset_circuit_hyperparams
 from elivagar.utils.datasets import TorchDataset
-from elivagar.utils.create_noise_models import get_noise_model, convert_braket_properties_to_qiskit_noise_model
+# [IBMQ-原始导入，已停用]
+# from elivagar.utils.create_noise_models import get_noise_model, convert_braket_properties_to_qiskit_noise_model
+from elivagar.utils.create_noise_models import convert_braket_properties_to_qiskit_noise_model
+# [FakeBackend] Snapshot-based noise model loading (returns the raw noise-model dictionary for per-circuit restriction).
+from elivagar.utils.create_noise_models import get_fake_backend_noise_model_dict
 from elivagar.training.train_circ_np import TQMseLoss
 from elivagar.inference.noise_model import run_noisy_inference_for_tq_circuits_qiskit
 
@@ -38,6 +43,11 @@ def main():
     parser.add_argument('--pick_best', action='store_true', help='pick the best training runs for the circuit or not')
     parser.add_argument('--use_quantumnat', action='store_true', help='use quantumnat or not')
     parser.add_argument('--quantumnat_trained_dir', default='', help='the folder where the quantumnat-trained models are stored')
+    # [FakeBackend] Optional overrides for the snapshot path and the per-circuit noise-model restriction.
+    parser.add_argument('--fake_backend_json', default=None,
+                        help='path to the FakeBackend properties JSON (defaults to the file resolved from --device_name)')
+    parser.add_argument('--full_noise_model', action='store_true',
+                        help='use the full device noise model instead of restricting it to each circuit\'s qubit mapping')
     
     args = parser.parse_args()
     
@@ -63,8 +73,18 @@ def main():
     
     start = time.time()
     
+    noise_model_data = None
+
     if args.device_properties_file is None:
-        noise_model, basis_gates, coupling_map = get_noise_model(args.device_name)
+        # [IBMQ-原始代码，已停用] Required an IBMQ account to download the device noise model.
+        # noise_model, basis_gates, coupling_map = get_noise_model(args.device_name)
+
+        # [FakeBackend] Load the snapshot noise-model dictionary; the Aer NoiseModel is built downstream,
+        # either restricted to each circuit's mapped qubits (default) or in full (--full_noise_model).
+        noise_model_data, basis_gates, coupling_map = get_fake_backend_noise_model_dict(
+            args.device_name, args.fake_backend_json
+        )
+        noise_model = None
         index_map = None
     else:
         noise_model, index_map, basis_gates, coupling_map = convert_braket_properties_to_qiskit_noise_model(
@@ -78,7 +98,9 @@ def main():
         args.num_test_samples, args.human_design, args.compute_noiseless,
         args.use_qubit_mapping, args.num_shots, args.qubit_mapping_filename,
         args.transpiler_opt_level, args.file_suffix, index_map, args.results_save_dir,
-        args.pick_best, args.use_quantumnat, args.quantumnat_trained_dir
+        args.pick_best, args.use_quantumnat, args.quantumnat_trained_dir,
+        noise_model_data=noise_model_data,
+        restrict_noise_to_mapping=not args.full_noise_model
     )    
     
     print('Time taken for', args.dataset, time.time() - start)

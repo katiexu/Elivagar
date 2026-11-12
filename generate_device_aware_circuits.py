@@ -3,10 +3,14 @@ import os
 import numpy as np
 import pickle as pkl
 
-from qiskit import IBMQ
+# [IBMQ-原始代码，已停用] from qiskit import IBMQ
 
 from elivagar.utils.dataset_circuit_hyperparams import dataset_circuit_hyperparams
 from elivagar.circuits.device_aware import generate_device_aware_gate_circ
+from elivagar.circuits.fake_backend_properties import (
+    load_fake_backend_properties,
+    resolve_fake_backend_json_path,
+)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -23,6 +27,7 @@ def main():
     parser.add_argument('--num_trial_mappings', type=int, default=100, help='the number of trial qubit mappings to consider')
     parser.add_argument('--temp', type=float, default=0.1, help='the temperature of the softmax distributions to sample from')
     parser.add_argument('--braket_device_properties_path', type=str, default=None, help='the path to the brakte device properties pkl file')
+    parser.add_argument('--fake_backend_json', type=str, default=None, help='path to the exported fake backend properties JSON')
     
     args = parser.parse_args()
     
@@ -47,17 +52,24 @@ def main():
         args.num_meas_qubits = curr_dataset_hyperparams['num_meas_qubits']    
     
     if args.braket_device_properties_path is None:
-        try:
-            provider = IBMQ.enable_account(
-                'f9be8ebe6cc0b5c9970ca5ae86acad18c1dfb3844ed12b381a458536fcbf46499d62dbb33da9a07627774441860c64ac44e76a6f27dc6f09bba7e0f2ce68e9ff')
-        except:
-            provider = IBMQ.load_account()
-
-        backend = provider.get_backend(args.device_name)
+# [IBMQ-原始代码，已停用]         try:
+# [IBMQ-原始代码，已停用]             provider = IBMQ.enable_account(
+# [IBMQ-原始代码，已停用]             <legacy IBMQ token omitted>
+# [IBMQ-原始代码，已停用]         except:
+# [IBMQ-原始代码，已停用]             provider = IBMQ.load_account()
+# [IBMQ-原始代码，已停用] 
+# [IBMQ-原始代码，已停用]         backend = provider.get_backend(args.device_name)
+        # [FakeBackend] Load the backend snapshot without contacting IBM Quantum.
+        backend = None
+        fake_backend_json_path = resolve_fake_backend_json_path(
+            args.device_name, args.fake_backend_json
+        )
+        fake_backend_properties = load_fake_backend_properties(fake_backend_json_path)
         dev_properties = None
     else:
         backend = None
         dev_properties = pkl.load(open(args.braket_device_properties_path, 'rb'))
+        fake_backend_properties = None
     
     for i in range(args.num_circs):
         curr_circ_dir = os.path.join(args.save_dir, f'circ_{i + 1}')
@@ -69,11 +81,14 @@ def main():
         
         circ_gates, gate_params, inputs_bounds, weights_bounds, selected_mapping, meas_qubits = generate_device_aware_gate_circ(
             backend, args.num_qubits, args.num_embeds, args.num_params, ent_prob, args.add_rotations, args.param_focus,
-            args.num_meas_qubits, args.num_trial_mappings, args.temp, braket_device_properties=dev_properties
+            args.num_meas_qubits, args.num_trial_mappings, args.temp,
+            braket_device_properties=dev_properties,
+            fake_backend_properties=fake_backend_properties,
         )
         
         np.savetxt(os.path.join(curr_circ_dir, 'gates.txt'), circ_gates, fmt="%s")
-        np.savetxt(os.path.join(curr_circ_dir, 'gate_params.txt'), gate_params, fmt="%s")
+        # [FakeBackend] Keep variable-width 1Q/2Q placements as object rows for NumPy compatibility.
+        np.savetxt(os.path.join(curr_circ_dir, 'gate_params.txt'), np.array(gate_params, dtype='object'), fmt="%s")
         np.savetxt(os.path.join(curr_circ_dir, 'inputs_bounds.txt'), inputs_bounds)
         np.savetxt(os.path.join(curr_circ_dir, 'weights_bounds.txt'), weights_bounds)
         np.savetxt(os.path.join(curr_circ_dir, 'qubit_mapping.txt'), selected_mapping)

@@ -25,6 +25,9 @@ def main():
     parser.add_argument('--use_qubit_mapping', action='store_true', help='whether to use qubit mapping or not')
     parser.add_argument('--save_cnr_scores', action='store_true', help='whether to store the computed CNR scores or not')
     parser.add_argument('--device_properties_file', type=str, default=None, help='the path to the pickled device properties file')
+    # [FakeBackend] Optional override for the local hardware/noise snapshot JSON.
+    parser.add_argument('--fake_backend_json', type=str, default=None, help='the path to a FakeBackend properties JSON snapshot')
+    parser.add_argument('--full_noise_model', action='store_true', help='use the full FakeBackend noise model instead of restricting it to each circuit mapping')
     parser.add_argument('--dataset_file_extension', default='txt', type=str, help='extension for the dataset files')
     parser.add_argument('--symmetric', action='store_true', help='whether the device edges are symmetric or not.')
     
@@ -57,7 +60,9 @@ def main():
         args.num_cdcs, args.num_shots, args.compute_actual_fidelity, args.num_trial_params,
         args.dataset, args.encoding_type, args.num_data_reps,
         noise_model, True, None, None, args.use_qubit_mapping, args.save_cnr_scores,  
-        index_mapping, args.circ_index_offset, args.dataset_file_extension
+        index_mapping, args.circ_index_offset, args.dataset_file_extension,
+        fake_backend_json=args.fake_backend_json,
+        restrict_noise_to_mapping=not args.full_noise_model,
     )
     
 if __name__ == '__main__':

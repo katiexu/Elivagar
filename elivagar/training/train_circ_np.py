@@ -17,7 +17,8 @@ class TQCeLoss(torch.nn.Module):
             
     def forward(self, preds, labels):
         useful_preds = torch.matmul(preds, self.filter_matrix)
-        loss = torch.nn.functional.cross_entropy(useful_preds, labels.long().squeeze())
+        # [MNIST-10 NLL] Keep class targets one-dimensional even when the final batch has one sample.
+        loss = torch.nn.functional.cross_entropy(useful_preds, labels.long().reshape(-1))
             
         return loss
 
@@ -49,13 +50,16 @@ def compute_tq_model_acc(preds, labels, num_meas_qubits):
 
 
 def compute_tq_model_acc_ce(preds, labels, num_meas_qubits):
+    # [MNIST-10 NLL] Normalize label shape so both (batch,) and (batch, 1) targets compare sample-wise.
+    labels = labels.reshape(-1, 1)
     return torch.sum(torch.eq(torch.argmax(preds[:, :num_meas_qubits], dim=1, keepdim=True), labels))
  
 
 def train_tq_model(model, num_meas_qubits, opt, loss, data_loader, test_data_loader,
                    epochs, print_freq=1, loss_window=50, acc_fn=None,
                    use_test=True, return_train_losses=False, quantize=False,
-                   noise_strength=0.1, device=torch.device('cpu')):
+                   noise_strength=0.1, device=torch.device('cpu'),
+                   train_metrics_data_loader=None):
     device = torch.device('cpu')
     
     if acc_fn == None:
@@ -130,5 +134,36 @@ def train_tq_model(model, num_meas_qubits, opt, loss, data_loader, test_data_loa
         
     if return_train_losses:
         ret_val.append(losses)
+
+    if train_metrics_data_loader is not None:
+        # [TrainMetrics] Evaluate the final model over every training sample with the same quantized hook as test evaluation.
+        train_loss_sum = 0.0
+        train_correct = 0.0
+        num_train_samples = 0
+
+        # [TrainMetrics] Restore Torch RNG state so this extra pass cannot affect subsequent run initialization/training.
+        with torch.random.fork_rng(devices=[]):
+            quantizer.register_hook()
+            try:
+                with torch.no_grad():
+                    for x, y in train_metrics_data_loader:
+                        x = x.to(torch.float).to(device)
+                        y = y.to(device)
+
+                        preds = model(x)
+                        batch_size = x.shape[0]
+                        train_loss_sum += loss(preds, y).item() * batch_size
+                        train_correct += acc_fn(preds, y, num_meas_qubits).item()
+                        num_train_samples += batch_size
+            finally:
+                quantizer.remove_hook()
+
+        if num_train_samples == 0:
+            raise ValueError('Cannot compute final training metrics for an empty training dataset.')
+
+        ret_val.append({
+            'loss': train_loss_sum / num_train_samples,
+            'accuracy': train_correct / num_train_samples,
+        })
         
     return ret_val

@@ -12,7 +12,14 @@ from qiskit.transpiler import Layout
 from elivagar.circuits.arbitrary import get_circ_params
 from elivagar.circuits.create_circuit import create_qiskit_circ, create_gate_circ
 from elivagar.inference.quantumnat import quantize_and_normalize
-from elivagar.inference.inference_metrics import mse_batch_loss, mse_vec_batch_loss, batch_acc, vec_batch_acc
+from elivagar.inference.inference_metrics import (
+    batch_acc,
+    ce_vec_batch_acc,
+    mse_batch_loss,
+    mse_vec_batch_loss,
+    nll_vec_batch_loss,
+    vec_batch_acc,
+)
 # [IBMQ-原始导入，已停用] get_noise_model needs an IBMQ account; inference now uses the FakeBackend snapshot.
 # from elivagar.utils.create_noise_models import noisy_dev_from_backend, get_noise_model
 from elivagar.utils.create_noise_models import noisy_dev_from_backend
@@ -71,7 +78,7 @@ def tq_model_inference_on_noisy_sim_qiskit(circ_dir, device_name, num_runs, num_
                                            coupling_map, qubit_mapping, x_test, y_test, params=None, save=True,
                                            num_shots=1024, compute_noiseless=False, transpile_opt_level=0,
                                            file_suffix='', index_map=None, results_save_dir=None, pick_best=False,
-                                           use_quantumnat=False, quantumnat_trained_dir=None):
+                                           use_quantumnat=False, quantumnat_trained_dir=None, loss_type='mse'):
     """
     Peform inference on test data x_test using a noisy simulator noisy_dev with a trained circuit stored in circ_dir.
     """
@@ -147,7 +154,12 @@ def tq_model_inference_on_noisy_sim_qiskit(circ_dir, device_name, num_runs, num_
         if use_quantumnat:
             val_exps = quantize_and_normalize(val_exps, curr_run_dir)
 
-        if len(meas_qubits) > 1:
+        if loss_type == 'nll':
+            # [MNIST-10 NLL] Treat noisy measurement expectations as logits, matching the training softmax path.
+            val_exps = val_exps.reshape((len(x_test), len(meas_qubits)))
+            val_loss = nll_vec_batch_loss(val_exps, y_test)
+            acc = ce_vec_batch_acc(val_exps, y_test)
+        elif len(meas_qubits) > 1:
             val_exps = val_exps.reshape((len(x_test), len(meas_qubits)))
             acc = vec_batch_acc(val_exps, y_test)
             val_loss = mse_vec_batch_loss(val_exps, y_test)
@@ -219,7 +231,7 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
                                                coupling_map, dataset, embed_type, num_data_reps, num_test_samples=None, human_design=False, compute_noiseless=False,
                                                use_qubit_mapping=False, num_shots=1024, qubit_mapping_file_name=None, transpile_opt_level=0, file_suffix='',
                                                index_map=None, results_save_dir=None, pick_best=False, use_quantumnat=False, quantumnat_trained_dir=None,
-                                               noise_model_data=None, restrict_noise_to_mapping=True):
+                                               noise_model_data=None, restrict_noise_to_mapping=True, file_type='txt', loss_type='mse'):
     """
     Run noisy inference for TQ circuits in the same folder - used to perform infrence for all ex. random, human designed, etc. circuits with one call.
 
@@ -227,7 +239,7 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
     a reduced AerSimulator containing only the errors on each circuit's mapped physical qubits is built per circuit; this is
     the same optimisation used for CNR and avoids re-serialising the full 133-qubit noise model for every test sample.
     """
-    x_train, y_train, x_test, y_test = load_dataset(dataset, embed_type, num_data_reps)
+    x_train, y_train, x_test, y_test = load_dataset(dataset, embed_type, num_data_reps, file_type=file_type)
     
     # [IBMQ-原始代码，已停用] The IBMQ fallback lookup is retained as a comment.
     # if noise_model is None and 'ibm' in device_name:
@@ -290,7 +302,7 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
             circ_noisy_dev, basis_gates, coupling_map, qubit_mapping,
             x_test, y_test, None, True, num_shots, compute_noiseless,
             transpile_opt_level, file_suffix, index_map, curr_results_save_dir,
-            pick_best, use_quantumnat, quantumnat_trained_dir
+            pick_best, use_quantumnat, quantumnat_trained_dir, loss_type
         )
         
         all_accs.append(accs_list[0])

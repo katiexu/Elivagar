@@ -4,21 +4,40 @@ import os
 import shutil
 
 from elivagar.circuits.arbitrary import get_circ_params
-from elivagar.training.train_circ_np import TQMseLoss
+from elivagar.training.train_circ_np import TQCeLoss, TQMseLoss
 from elivagar.utils.datasets import TorchDataset
 from elivagar.training.train_tq_circ_and_save import train_tq_circ_and_save_results
 from elivagar.metric_computation.compute_composite_scores import compute_composite_scores_for_circs
 
 def train_elivagar_circuits(circ_dir, dataset, embed_type, num_data_reps, device_name, num_epochs, batch_size, num_qubits, num_meas_qubits,
                             num_data_for_rep_cap, num_params_for_rep_cap, num_cdcs, num_candidates_per_circuit=100,
-                            num_circuits=2500, num_runs=5, noise_importance=0.5, results_dir=None, learning_rate=0.01):
+                            num_circuits=2500, num_runs=5, noise_importance=0.5, results_dir=None, learning_rate=0.01,
+                            save_train_metrics=False, loss_type='mse', file_type='txt', num_train_samples=None):
     """
     Compute the composite scores for all the circuits in a directory and train the top-ranked circuits.
     """
-    loss = TQMseLoss(num_meas_qubits, num_qubits)
+    if loss_type == 'mse':
+        loss = TQMseLoss(num_meas_qubits, num_qubits)
+        use_softmax = False
+    elif loss_type == 'nll':
+        # [MNIST-10 NLL] Use the measured outputs as class logits and integer labels as targets.
+        loss = TQCeLoss(num_qubits, num_meas_qubits, torch.device('cpu'))
+        use_softmax = True
+    else:
+        raise ValueError(f"Unsupported training loss: {loss_type!r}")
 
-    train_data = TorchDataset(dataset, embed_type, num_data_reps, reshape_labels=True)
-    test_data = TorchDataset(dataset, embed_type, num_data_reps, False, reshape_labels=True)
+    train_data = TorchDataset(dataset, embed_type, num_data_reps, reshape_labels=True, file_type=file_type)
+    test_data = TorchDataset(dataset, embed_type, num_data_reps, False, reshape_labels=True, file_type=file_type)
+
+    if num_train_samples is not None:
+        # [MNIST-10 NLL] An optional random subset makes early runtime estimates affordable.
+        if num_train_samples <= 0 or num_train_samples > len(train_data):
+            raise ValueError(
+                f"num_train_samples must be between 1 and {len(train_data)}, got {num_train_samples}"
+            )
+        if num_train_samples < len(train_data):
+            subset_indices = torch.randperm(len(train_data))[:num_train_samples].tolist()
+            train_data = torch.utils.data.Subset(train_data, subset_indices)
 
     train_data_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, sampler=torch.utils.data.RandomSampler(train_data))
     test_data_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, sampler=torch.utils.data.SequentialSampler(test_data))
@@ -77,7 +96,9 @@ def train_elivagar_circuits(circ_dir, dataset, embed_type, num_data_reps, device
         np.savetxt(curr_circ_dir + '/sel_circuit_score.txt', [np.max(curr_candidate_scores)])
         
         circ_losses, circ_accs = train_tq_circ_and_save_results(curr_circ_dir, train_data_loader, test_data_loader, num_runs, num_epochs,
-                                       num_qubits, num_meas_qubits, loss, learning_rate=learning_rate)
+                                        num_qubits, num_meas_qubits, loss, learning_rate=learning_rate,
+                                        save_train_metrics=save_train_metrics,
+                                        use_softmax=use_softmax)
         
         trial_losses.append(circ_losses)
         trial_accs.append(circ_accs)

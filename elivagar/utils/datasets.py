@@ -26,7 +26,7 @@ def load_dataset(name, embedding_type, num_reps, file_type='txt'):
         
         y_train = 1 - 2 * y_train[:, 0]
         y_test = 1 - 2 * y_test[:, 0]
-    elif name in ['mnist_2', 'fmnist_2', 'mnist_4', 'fmnist_4']:
+    elif name in ['mnist_2', 'fmnist_2', 'mnist_4', 'fmnist_4', 'mnist_4_0123']:
         x_train = x_train[:, :16]
         x_test = x_test[:, :16]
     elif name in ['mnist_10_6', 'mnist_10_8']:
@@ -65,7 +65,7 @@ def load_dataset(name, embedding_type, num_reps, file_type='txt'):
             x_train = np.concatenate((x_train, np.zeros((len(x_train), 2))), 1)
             x_test = np.concatenate((x_test, np.zeros((len(x_test), 2))), 1)
     elif embedding_type == 'iqp':
-        if name in ['mnist_2', 'mnist_4', 'fmnist_2', 'fmnist_4']:
+        if name in ['mnist_2', 'mnist_4', 'fmnist_2', 'fmnist_4', 'mnist_4_0123']:
             p_1 = np.prod(x_train[:, :4], 1).reshape((len(x_train), 1))
             p_2 = np.prod(x_train[:, 4:8], 1).reshape((len(x_train), 1))
             p_3 = np.prod(x_train[:, 8:12], 1).reshape((len(x_train), 1))
@@ -160,7 +160,7 @@ def load_dataset(name, embedding_type, num_reps, file_type='txt'):
             x_train = new_x_train
             x_test = new_x_test
     elif embedding_type == 'supernet':
-        if name in ['mnist_2', 'mnist_4', 'fmnist_2', 'fmnist_4']:
+        if name in ['mnist_2', 'mnist_4', 'fmnist_2', 'fmnist_4', 'mnist_4_0123']:
             p_1 = np.prod(np.pi - x_train[:, :4], 1).reshape((len(x_train), 1))
             p_2 = np.prod(np.pi - x_train[:, 4:8], 1).reshape((len(x_train), 1))
             p_3 = np.prod(np.pi - x_train[:, 8:12], 1).reshape((len(x_train), 1))

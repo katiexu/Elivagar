@@ -7,18 +7,20 @@ dataset_names = [
     'mnist_10_8', 'mnist_10_6', 'mnist_10_6_nll',
     'mnist_2_fullsize', 'fmnist_2_fullsize',
     'mnist_4_fullsize', 'fmnist_4_fullsize',
-    'mnist_10'
+    'mnist_10',
+    # [MNIST-4 0–3] Reuse the 4-qubit architecture for the newly generated 0/1/2/3 data.
+    'mnist_4_0123'
 ]
 
-circuit_params = [16, 20, 20, 24, 32, 32, 40, 40, 120, 60, 72, 20, 32, 40, 24, 72]
-circuit_embeds = [4, 8, 16, 16, 16, 10, 10, 16, 64, 36, 36, 16, 16, 16, 16, 36]
-circuit_qubits = [2, 4, 4, 4, 4, 4, 4, 4, 8, 6, 10, 4, 4, 4, 4, 6]
-num_data_reps = [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-num_meas_qubits = [1, 1, 1, 2, 1, 1, 2, 2, 4, 4, 10, 1, 1, 2, 2, 4]
-num_embed_layers_angle_iqp = [2, 2, 4, 4, 4, 3, 3, 4, 8, 6, 4, 4, 4, 4, 4, 6]
-num_embed_layers_amp = [1 for i in range(16)]
-num_var_layers = [8, 5, 5, 6, 8, 8, 10, 10, 15, 10, 8, 5, 8, 10, 6, 12]
-num_classes = [2, 2, 2, 4, 2, 2, 4, 4, 10, 10, 10, 2, 2, 4, 4, 10]
+circuit_params = [16, 20, 20, 24, 32, 32, 40, 40, 120, 60, 72, 20, 32, 40, 24, 72, 40]
+circuit_embeds = [4, 8, 16, 16, 16, 10, 10, 16, 64, 36, 36, 16, 16, 16, 16, 36, 16]
+circuit_qubits = [2, 4, 4, 4, 4, 4, 4, 4, 8, 6, 10, 4, 4, 4, 4, 6, 4]
+num_data_reps = [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+num_meas_qubits = [1, 1, 1, 2, 1, 1, 2, 2, 4, 4, 10, 1, 1, 2, 2, 4, 2]
+num_embed_layers_angle_iqp = [2, 2, 4, 4, 4, 3, 3, 4, 8, 6, 4, 4, 4, 4, 4, 6, 4]
+num_embed_layers_amp = [1 for i in range(len(dataset_names))]
+num_var_layers = [8, 5, 5, 6, 8, 8, 10, 10, 15, 10, 8, 5, 8, 10, 6, 12, 10]
+num_classes = [2, 2, 2, 4, 2, 2, 4, 4, 10, 10, 10, 2, 2, 4, 4, 10, 4]
 
 for i in range(len(dataset_names)):
     dataset_circuit_hyperparams[dataset_names[i]] = dict()

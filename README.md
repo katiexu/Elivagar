@@ -100,3 +100,39 @@ bash scripts/mnist_2/elivagar/eval_FakeTorino.sh
 ```
 
 Circuit generation uses the snapshot's hardware properties. CNR and noisy inference build an `AerSimulator` from its noise model; neither runs a `FakeTorino` backend object or connects to IBM hardware. RepCap and model training are classical/device-independent stages, although training uses the CNR and RepCap scores. Install the additional RepCap dependency in `elivagar` with `python -m pip install "qutip<5"` if it is not already available.
+
+### MNIST-4 digits 0–3 Élivágar workflow
+
+The `mnist_4_0123` dataset contains all MNIST examples labeled 0, 1, 2, or 3 (28,911 total). The generator combines the original MNIST training and test files, then creates a stratified 80:20 split by default; consequently, it does not preserve the original official train/test boundary. To regenerate the four text files from the standard IDX files in `experiment_data/MNIST/raw`, run this from the repository root:
+
+```bash
+python experiment_data/make_mnist_4_0123.py
+```
+
+The output is written to `experiment_data/mnist_4_0123/` (23,129 training and 5,782 test examples with the default seed and ratio). The existing preprocessing produces 16 features per image and two-column bipolar labels. The split ratio and random seed can be changed with `--train_ratio` and `--seed`.
+
+Run the five FakeTorino scripts in order from the repository root, in the `elivagar` environment:
+
+```bash
+bash scripts/mnist_4/elivagar/circ_gen_FakeTorino.sh
+bash scripts/mnist_4/elivagar/cnr_FakeTorino.sh
+bash scripts/mnist_4/elivagar/repcap_FakeTorino.sh
+bash scripts/mnist_4/elivagar/train_FakeTorino.sh
+bash scripts/mnist_4/elivagar/eval_FakeTorino.sh
+```
+
+These scripts save their circuits and results under `experiments/mnist_4_0123/40_params/ibm_FakeTorino/elivagar/`. RepCap samples 16 examples per class (64 total) for each circuit; training uses the full training split. The evaluation script follows the original MNIST-4 setting and samples 2,000 test examples rather than all 5,782. Remove `--num_test_samples 2000` from that script to evaluate the full test split. Training uses the larger dataset and can take substantially longer than MNIST-2; the Osaka-named scripts are retained unchanged for the original workflow.
+
+### MNIST-10 NLL FakeTorino workflow
+
+The `mnist_10_6_nll` dataset uses 36 features per image, 10 measured qubits/classes, and integer class labels from 0 to 9. Its NPY files contain 50,000 training and 10,000 test examples. Run the five FakeTorino scripts from the repository root in order:
+
+```bash
+bash scripts/mnist_10/elivagar/circ_gen_FakeTorino.sh
+bash scripts/mnist_10/elivagar/cnr_FakeTorino.sh
+bash scripts/mnist_10/elivagar/repcap_FakeTorino.sh
+bash scripts/mnist_10/elivagar/train_FakeTorino.sh
+bash scripts/mnist_10/elivagar/eval_FakeTorino.sh
+```
+
+The scripts use the existing `mnist_10_6_nll` NPY dataset and save outputs under `experiments/mnist_10_6_nll/72_params/ibm_FakeTorino/elivagar/`. Training uses NLL for 50 epochs and, by default, all 50,000 training examples; add `--num_train_samples 512` to the training command for a smaller pilot. Evaluation samples 400 test examples per trial. CNR and noisy inference use the FakeTorino snapshot through `AerSimulator`, not a live IBM backend. Runtime depends heavily on CPU performance and the generated circuits; measure the pilot before scheduling the full 2,500-circuit workflow.

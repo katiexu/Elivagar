@@ -27,6 +27,16 @@ def main():
     parser.add_argument('--num_candidates_per_circ', default=100, type=int,help='number of candidate circuits to evaluate for every circuit trained')
     parser.add_argument('--save_dir', default=None, help='folder to save the generated circuits, trained models, and training results in')
     parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')    
+    # [TrainMetrics] Save final-model metrics over the full training dataset when requested.
+    parser.add_argument('--save_train_metrics', action='store_true',
+                        help='save final full-training-set accuracy and loss for each run')
+    # [MNIST-10 NLL] Keep legacy MSE/TXT defaults while allowing integer-label NLL experiments on NPY data.
+    parser.add_argument('--loss', choices=['mse', 'nll'], default='mse',
+                        help='training loss: MSE for vector labels or NLL for integer class labels')
+    parser.add_argument('--dataset_file_extension', choices=['txt', 'npy'], default='txt',
+                        help='file extension used by the selected dataset')
+    parser.add_argument('--num_train_samples', type=int, default=None,
+                        help='optional random training subset size; default uses all training samples')
 
     args = parser.parse_args()
     
@@ -59,7 +69,11 @@ def main():
                             args.num_data_for_rep_cap, args.num_params_for_rep_cap,
                             args.num_cdcs, args.num_candidates_per_circ,
                             args.num_circs, args.num_runs_per_circ, args.noise_importance,
-                            args.save_dir, args.learning_rate)
+                            args.save_dir, args.learning_rate,
+                            save_train_metrics=args.save_train_metrics,
+                            loss_type=args.loss,
+                            file_type=args.dataset_file_extension,
+                            num_train_samples=args.num_train_samples)
     
 if __name__ == '__main__':
     main()

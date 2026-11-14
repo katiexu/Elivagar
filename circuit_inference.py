@@ -33,6 +33,11 @@ def main():
     parser.add_argument('--human_design', action='store_true', help='whether the circuit is human designed or not')
     parser.add_argument('--circs_dir', default='./', help='the folder where all the circuits are stored')
     parser.add_argument('--num_test_samples', default=None, type=int, help='the number of test samples to evaluate circuits on')
+    # [MNIST-10 NLL] Permit NPY datasets with integer class labels and their matching loss/accuracy metrics.
+    parser.add_argument('--dataset_file_extension', choices=['txt', 'npy'], default='txt',
+                        help='file extension used by the selected dataset')
+    parser.add_argument('--loss', choices=['mse', 'nll'], default='mse',
+                        help='evaluation loss: MSE for vector labels or NLL for integer class labels')
     parser.add_argument('--compute_noiseless', action='store_true', help='whether to compute noiseless outputs as a sanity check')
     parser.add_argument('--use_qubit_mapping', action='store_true', help='whether to use qubit mapping or not')
     parser.add_argument('--device_properties_file', default=None, help='path to the device properties file')
@@ -100,7 +105,9 @@ def main():
         args.transpiler_opt_level, args.file_suffix, index_map, args.results_save_dir,
         args.pick_best, args.use_quantumnat, args.quantumnat_trained_dir,
         noise_model_data=noise_model_data,
-        restrict_noise_to_mapping=not args.full_noise_model
+        restrict_noise_to_mapping=not args.full_noise_model,
+        file_type=args.dataset_file_extension,
+        loss_type=args.loss
     )    
     
     print('Time taken for', args.dataset, time.time() - start)
